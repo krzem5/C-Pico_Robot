@@ -5,7 +5,7 @@
 
 
 #define ULTRASONIC_TRIGGER_PIN 16
-#define ULTRASONIC_ECHO_PIN 17
+#define ULTRASONIC_ECHO_PIN 0
 #define ULTRASONIC_MAX_DISTANCE 450
 #define ULTRASONIC_SOUND_SPEED_FACTOR 0.0343f
 #define ULTRASONIC_MAX_WAIT_TICKS 550000
@@ -70,8 +70,8 @@ int main(){
 		else{
 			gpio_put(PICO_DEFAULT_LED_PIN,1);
 		}
-		float dist=_get_distance()*ULTRASONIC_SOUND_SPEED_FACTOR/2;
-		printf("Distance: %.2f\n",dist);
+		uint32_t dist=_get_distance();
+		printf("Distance: %.2f\n",dist*ULTRASONIC_SOUND_SPEED_FACTOR/2);
 		sleep_ms(16);
 	}
 	reset_usb_boot(0,0);
