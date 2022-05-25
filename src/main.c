@@ -6,9 +6,10 @@
 
 #define ULTRASONIC_TRIGGER_PIN 16
 #define ULTRASONIC_PIN_COUNT_SHIFT 1
-#define ULTRASONIC_MAX_DISTANCE 450
+#define ULTRASONIC_MAX_DISTANCE 75
+#define ULTRASONIC_MAX_DISTANCE_TIME ((uint32_t)(ULTRASONIC_MAX_DISTANCE/ULTRASONIC_SOUND_SPEED_FACTOR*2))
 #define ULTRASONIC_SOUND_SPEED_FACTOR 0.0343f
-#define ULTRASONIC_MAX_WAIT_TICKS 100000
+#define ULTRASONIC_MAX_WAIT_TICKS 80000
 #define ULTRASONIC_SMOOTH_ARRAY_LENGTH_SHIFT 5
 
 
@@ -56,13 +57,20 @@ static void _get_distance(void){
 		}
 	}
 	for (unsigned int i=0;i<(1<<ULTRASONIC_PIN_COUNT_SHIFT);i++){
+		uint32_t time;
 		if (start_time[i]>>31){
-			uint32_t time=start_time[i]&0x7fffffff;
-			uint32_t* ptr=_ultrasonic_smooth+(i<<ULTRASONIC_SMOOTH_ARRAY_LENGTH_SHIFT)+_ultrasonic_smooth_index[i];
-			_ultrasonic_smooth_sum[i]+=time-(*ptr);
-			*ptr=time;
-			_ultrasonic_smooth_index[i]=(_ultrasonic_smooth_index[i]+1)&((1<<ULTRASONIC_SMOOTH_ARRAY_LENGTH_SHIFT)-1);
+			time=start_time[i]&0x7fffffff;
+			if (time>ULTRASONIC_MAX_DISTANCE_TIME){
+				time=ULTRASONIC_MAX_DISTANCE_TIME;
+			}
 		}
+		else{
+			time=ULTRASONIC_MAX_DISTANCE_TIME;
+		}
+		uint32_t* ptr=_ultrasonic_smooth+(i<<ULTRASONIC_SMOOTH_ARRAY_LENGTH_SHIFT)+_ultrasonic_smooth_index[i];
+		_ultrasonic_smooth_sum[i]+=time-(*ptr);
+		*ptr=time;
+		_ultrasonic_smooth_index[i]=(_ultrasonic_smooth_index[i]+1)&((1<<ULTRASONIC_SMOOTH_ARRAY_LENGTH_SHIFT)-1);
 	}
 }
 
@@ -70,7 +78,7 @@ static void _get_distance(void){
 
 int main(){
 	for (uint32_t i=0;i<(1<<(ULTRASONIC_SMOOTH_ARRAY_LENGTH_SHIFT+ULTRASONIC_PIN_COUNT_SHIFT));i++){
-		_ultrasonic_smooth[i]=0;
+		_ultrasonic_smooth[i]=ULTRASONIC_MAX_DISTANCE_TIME;
 	}
 	stdio_init_all();
 	stdio_usb_init();
@@ -79,7 +87,7 @@ int main(){
 	gpio_set_dir(ULTRASONIC_TRIGGER_PIN,GPIO_OUT);
 	gpio_set_dir(PICO_DEFAULT_LED_PIN,GPIO_OUT);
 	for (uint32_t i=0;i<(1<<ULTRASONIC_PIN_COUNT_SHIFT);i++){
-		_ultrasonic_smooth_sum[i]=0;
+		_ultrasonic_smooth_sum[i]=ULTRASONIC_MAX_DISTANCE_TIME<<ULTRASONIC_SMOOTH_ARRAY_LENGTH_SHIFT;
 		_ultrasonic_smooth_index[i]=0;
 		gpio_init(i);
 		gpio_set_dir(i,GPIO_IN);
