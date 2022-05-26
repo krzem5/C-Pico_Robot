@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <pico/bootrom.h>
 #include <pico/stdlib.h>
-#include <hardware/clocks.h>
+#include <hardware/pwm.h>
 
 
 
-#define ULTRASONIC_TRIGGER_PIN 16
+#define ULTRASONIC_TRIGGER_PIN 10
 #define ULTRASONIC_PIN_TRIGGER_PULSE_US 5
 #define ULTRASONIC_PIN_COUNT 8
 #define ULTRASONIC_PIN_OFFSET 2
@@ -13,9 +13,20 @@
 #define ULTRASONIC_MAX_DISTANCE_TIME ((uint32_t)(ULTRASONIC_MAX_DISTANCE/ULTRASONIC_SOUND_SPEED_FACTOR*2))
 #define ULTRASONIC_SOUND_SPEED_FACTOR 0.0343f
 
+#define MOTOR_PWM_WRAP 255
+#define MOTOR_PWM_1A 16
+#define MOTOR_PWM_1B 17
+#define MOTOR_PWM_SLICE_1 0
+
 
 
 static uint32_t _ultrasonic_values[ULTRASONIC_PIN_COUNT];
+
+
+
+static inline int32_t _map(int32_t v,int32_t aa,int32_t ab,int32_t ba,int32_t bb){
+	return (v-aa)*(bb-ba)/(ab-aa)+ba;
+}
 
 
 
@@ -47,7 +58,6 @@ static void _get_distance(void){
 				i-=ULTRASONIC_PIN_OFFSET;
 				if (state&bit){
 					start_time[i]=time;
-					_ultrasonic_values[i]=0;
 				}
 				else{
 					time-=start_time[i];
@@ -72,6 +82,11 @@ int main(){
 		gpio_init(i);
 		gpio_set_dir(i,GPIO_IN);
 	}
+	gpio_set_function(MOTOR_PWM_1A,GPIO_FUNC_PWM);
+	gpio_set_function(MOTOR_PWM_1B,GPIO_FUNC_PWM);
+	pwm_set_wrap(MOTOR_PWM_SLICE_1,MOTOR_PWM_WRAP);
+	pwm_set_both_levels(MOTOR_PWM_SLICE_1,0,0);
+	pwm_set_enabled(MOTOR_PWM_SLICE_1,1);
 	gpio_put(ULTRASONIC_TRIGGER_PIN,0);
 	gpio_put(PICO_DEFAULT_LED_PIN,1);
 	sleep_ms(200);
