@@ -91,7 +91,7 @@ int main(){
 		uint32_t start=time_us_32();
 		_get_distance();
 		uint32_t end=time_us_32();
-		printf("[%0.2u]: %05.2f, %05.2f, %05.2f, %05.2f, %05.2f, %05.2f, %05.2f, %05.2f\n",(end-start)/1000,_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2);
+		printf("[%0.2u]: %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u\n",(end-start)/1000,(uint32_t)(_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2));
 	}
 	reset_usb_boot(0,0);
 	return 0;
