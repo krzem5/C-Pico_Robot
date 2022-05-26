@@ -24,12 +24,6 @@ static uint32_t _ultrasonic_values[ULTRASONIC_PIN_COUNT];
 
 
 
-static inline int32_t _map(int32_t v,int32_t aa,int32_t ab,int32_t ba,int32_t bb){
-	return (v-aa)*(bb-ba)/(ab-aa)+ba;
-}
-
-
-
 static void _get_distance(void){
 	gpio_put(ULTRASONIC_TRIGGER_PIN,1);
 	uint32_t end=time_us_32()+ULTRASONIC_PIN_TRIGGER_PULSE_US;
