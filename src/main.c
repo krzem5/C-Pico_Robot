@@ -17,10 +17,19 @@
 #define MOTOR_PWM_1A 16
 #define MOTOR_PWM_1B 17
 #define MOTOR_PWM_SLICE_1 0
+#define MOTOR_PWM_2A 18
+#define MOTOR_PWM_2B 19
+#define MOTOR_PWM_SLICE_2 1
 
 
 
 static uint32_t _ultrasonic_values[ULTRASONIC_PIN_COUNT];
+
+
+
+static inline int32_t _map(int32_t v,int32_t aa,int32_t ab,int32_t ba,int32_t bb){
+	return (v-aa)*(bb-ba)/(ab-aa)+ba;
+}
 
 
 
@@ -78,9 +87,14 @@ int main(){
 	}
 	gpio_set_function(MOTOR_PWM_1A,GPIO_FUNC_PWM);
 	gpio_set_function(MOTOR_PWM_1B,GPIO_FUNC_PWM);
+	gpio_set_function(MOTOR_PWM_2A,GPIO_FUNC_PWM);
+	gpio_set_function(MOTOR_PWM_2B,GPIO_FUNC_PWM);
 	pwm_set_wrap(MOTOR_PWM_SLICE_1,MOTOR_PWM_WRAP);
+	pwm_set_wrap(MOTOR_PWM_SLICE_2,MOTOR_PWM_WRAP);
 	pwm_set_both_levels(MOTOR_PWM_SLICE_1,0,0);
+	pwm_set_both_levels(MOTOR_PWM_SLICE_2,0,0);
 	pwm_set_enabled(MOTOR_PWM_SLICE_1,1);
+	pwm_set_enabled(MOTOR_PWM_SLICE_2,1);
 	gpio_put(ULTRASONIC_TRIGGER_PIN,0);
 	gpio_put(PICO_DEFAULT_LED_PIN,1);
 	sleep_ms(200);
@@ -90,6 +104,7 @@ int main(){
 	sleep_ms(200);
 	gpio_put(PICO_DEFAULT_LED_PIN,0);
 	sleep_ms(200);
+	static uint32_t time=0;
 	while (getchar_timeout_us(1)==PICO_ERROR_TIMEOUT){
 		if (stdio_usb_connected()){
 			gpio_put(PICO_DEFAULT_LED_PIN,0);
@@ -101,6 +116,8 @@ int main(){
 		_get_distance();
 		uint32_t end=time_us_32();
 		printf("[%0.2u]: %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u\n",(end-start)/1000,(uint32_t)(_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2));
+		pwm_set_both_levels(MOTOR_PWM_SLICE_1,time&MOTOR_PWM_WRAP,0);
+		time++;
 	}
 	reset_usb_boot(0,0);
 	return 0;
