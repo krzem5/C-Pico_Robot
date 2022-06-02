@@ -1,7 +1,8 @@
 #include <stdio.h>
+#include <hardware/clocks.h>
+#include <hardware/pwm.h>
 #include <pico/bootrom.h>
 #include <pico/stdlib.h>
-#include <hardware/pwm.h>
 
 
 
@@ -13,7 +14,8 @@
 #define ULTRASONIC_MAX_DISTANCE_TIME ((uint32_t)(ULTRASONIC_MAX_DISTANCE/ULTRASONIC_SOUND_SPEED_FACTOR*2))
 #define ULTRASONIC_SOUND_SPEED_FACTOR 0.0343f
 
-#define MOTOR_PWM_WRAP 255
+#define MOTOR_PWM_FREQUENCY 60
+#define MOTOR_PWM_WRAP 4096
 #define MOTOR_PWM_1A 16
 #define MOTOR_PWM_1B 17
 #define MOTOR_PWM_SLICE_1 0
@@ -89,8 +91,11 @@ int main(){
 	gpio_set_function(MOTOR_PWM_1B,GPIO_FUNC_PWM);
 	gpio_set_function(MOTOR_PWM_2A,GPIO_FUNC_PWM);
 	gpio_set_function(MOTOR_PWM_2B,GPIO_FUNC_PWM);
-	pwm_set_wrap(MOTOR_PWM_SLICE_1,MOTOR_PWM_WRAP);
-	pwm_set_wrap(MOTOR_PWM_SLICE_2,MOTOR_PWM_WRAP);
+	pwm_config pwm_cfg=pwm_get_default_config();
+	pwm_config_set_clkdiv(&pwm_cfg,clock_get_hz(clk_sys)/((float)(MOTOR_PWM_FREQUENCY*MOTOR_PWM_WRAP)));
+	pwm_config_set_wrap(&pwm_cfg,MOTOR_PWM_WRAP);
+	pwm_init(MOTOR_PWM_SLICE_1,&pwm_cfg,true);
+	pwm_init(MOTOR_PWM_SLICE_2,&pwm_cfg,true);
 	pwm_set_both_levels(MOTOR_PWM_SLICE_1,0,0);
 	pwm_set_both_levels(MOTOR_PWM_SLICE_2,0,0);
 	pwm_set_enabled(MOTOR_PWM_SLICE_1,1);
@@ -115,9 +120,11 @@ int main(){
 		uint32_t start=time_us_32();
 		_get_distance();
 		uint32_t end=time_us_32();
-		printf("[%0.2u]: %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u\n",(end-start)/1000,(uint32_t)(_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2));
-		pwm_set_both_levels(MOTOR_PWM_SLICE_1,time&MOTOR_PWM_WRAP,0);
-		time++;
+		uint32_t speed=_map(time,0,(1<<9)-1,MOTOR_PWM_WRAP/6,MOTOR_PWM_WRAP);
+		printf("[%0.2u]: %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u -> %0.4u\n",(end-start)/1000,(uint32_t)(_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2),speed);
+		pwm_set_both_levels(MOTOR_PWM_SLICE_1,speed,0);
+		pwm_set_both_levels(MOTOR_PWM_SLICE_2,0,speed);
+		time=(time+1)&((1<<9)-1);
 	}
 	reset_usb_boot(0,0);
 	return 0;
