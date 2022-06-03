@@ -29,13 +29,7 @@ static uint32_t _ultrasonic_values[ULTRASONIC_PIN_COUNT];
 
 
 
-static inline int32_t _map(int32_t v,int32_t aa,int32_t ab,int32_t ba,int32_t bb){
-	return (v-aa)*(bb-ba)/(ab-aa)+ba;
-}
-
-
-
-static void _get_distance(void){
+static void _update_sensors(void){
 	gpio_put(ULTRASONIC_TRIGGER_PIN,1);
 	uint32_t end=time_us_32()+ULTRASONIC_PIN_TRIGGER_PULSE_US;
 	uint32_t mask=((1<<ULTRASONIC_PIN_COUNT)-1)<<ULTRASONIC_PIN_OFFSET;
@@ -72,6 +66,12 @@ static void _get_distance(void){
 			} while (change);
 		}
 	} while (mask);
+}
+
+
+static void _drive_motors(int32_t left,int32_t right){
+	pwm_set_both_levels(MOTOR_PWM_SLICE_1,(left>0?left:0),(left<0?-left:0));
+	pwm_set_both_levels(MOTOR_PWM_SLICE_2,(right>0?right:0),(right<0?-right:0));
 }
 
 
@@ -117,11 +117,10 @@ int main(){
 			gpio_put(PICO_DEFAULT_LED_PIN,1);
 		}
 		uint32_t start=time_us_32();
-		_get_distance();
+		_update_sensors();
 		uint32_t end=time_us_32();
 		printf("[%0.2u]: %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u, %0.2u\n",(end-start)/1000,(uint32_t)(_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2),(uint32_t)(_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2));
-		pwm_set_both_levels(MOTOR_PWM_SLICE_1,MOTOR_PWM_WRAP,0);
-		pwm_set_both_levels(MOTOR_PWM_SLICE_2,MOTOR_PWM_WRAP>>1,0);
+		_drive_motors(4096,-4096);
 	}
 	reset_usb_boot(0,0);
 	return 0;
