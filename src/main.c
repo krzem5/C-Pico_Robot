@@ -17,6 +17,7 @@
 
 #define ADXL345_BAUDRATE 400000
 #define ADXL345_REGISTER_DEVICE_ID 0x00
+#define ADXL345_REGISTER_OFFSETS 0x1e
 #define ADXL345_REGISTER_POWER_CONTROL 0x2d
 #define ADXL345_REGISTER_DATA 0x32
 #define ADXL345_ENABLE_MEASUREMENT 0b00001000
@@ -41,6 +42,7 @@
 
 static uint32_t _ultrasonic_values[ULTRASONIC_PIN_COUNT];
 static int16_t _acceleration_values[2];
+static int16_t _acceleration_offsets[2];
 
 
 
@@ -83,11 +85,9 @@ static inline void _update_sensors(void){
 			} while (change);
 		}
 	} while (mask);
-	if (i2c_read_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,i2c_data,6,0)!=6){
-		return;
-	}
-	_acceleration_values[0]=((int16_t*)i2c_data)[0];
-	_acceleration_values[1]=((int16_t*)i2c_data)[2];
+	i2c_read_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,i2c_data,6,0);
+	_acceleration_values[0]=((int16_t*)i2c_data)[0]+_acceleration_offsets[0];
+	_acceleration_values[1]=((int16_t*)i2c_data)[2]+_acceleration_offsets[1];
 }
 
 
@@ -132,7 +132,7 @@ static inline uint8_t _init_accelerometer(void){
 	gpio_set_function(ADXL345_I2C_SCL_PIN,GPIO_FUNC_I2C);
 	gpio_set_pulls(ADXL345_I2C_SDA_PIN,1,0);
 	gpio_set_pulls(ADXL345_I2C_SCL_PIN,1,0);
-	uint8_t data[2]={ADXL345_REGISTER_DEVICE_ID};
+	uint8_t data[6]={ADXL345_REGISTER_DEVICE_ID};
 	i2c_write_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,1,0);
 	i2c_read_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,1,0);
 	if (data[0]!=ADXL345_DEVICE_ID){
@@ -142,11 +142,16 @@ static inline uint8_t _init_accelerometer(void){
 	data[0]=ADXL345_REGISTER_POWER_CONTROL;
 	data[1]=ADXL345_ENABLE_MEASUREMENT;
 	i2c_write_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,2,0);
-	i2c_read_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,1,0);
-	if (data[0]!=ADXL345_ENABLE_MEASUREMENT){
-		printf("i2c communication error! (%u)\n",data);
-		return 0;
-	}
+	data[0]=ADXL345_REGISTER_OFFSETS;
+	data[1]=0;
+	data[2]=0;
+	data[3]=0;
+	i2c_write_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,4,0);
+	data[0]=ADXL345_REGISTER_DATA;
+	i2c_write_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,1,0);
+	i2c_read_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,6,0);
+	_acceleration_offsets[0]=-((int16_t*)data)[0];
+	_acceleration_offsets[1]=-((int16_t*)data)[2];
 	return 1;
 }
 
@@ -193,7 +198,7 @@ int main(){
 		uint32_t start=time_us_32();
 		_update_sensors();
 		uint32_t end=time_us_32();
-		printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%05.2f %05.2f}\n",(end-start)/1000,_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_acceleration_values[0]*ACCELERATION_FACTOR,_acceleration_values[1]*ACCELERATION_FACTOR);
+		printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%+05.2f %+05.2f}\n",(end-start)/1000,_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_acceleration_values[0]*ACCELERATION_FACTOR,_acceleration_values[1]*ACCELERATION_FACTOR);
 	}
 	reset_usb_boot(0,0);
 	return 0;
