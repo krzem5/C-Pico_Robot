@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <hardware/clocks.h>
 #include <hardware/i2c.h>
 #include <hardware/pwm.h>
@@ -16,6 +15,7 @@
 #define ULTRASONIC_MAX_DISTANCE_TIME ULTRASONIC_DISTANCE_TO_TIME(ULTRASONIC_MAX_DISTANCE)
 #define ULTRASONIC_SOUND_SPEED_FACTOR 0.0343f
 #define ULTRASONIC_DISTANCE_TO_TIME(x) ((uint32_t)((x)/ULTRASONIC_SOUND_SPEED_FACTOR*2))
+#define ULTRASONIC_TRANSITION_VALUES(old,new) ((uint32_t)((old)*0.75f+(new)*0.25f))
 
 #define ADXL345_BAUDRATE 400000
 #define ADXL345_REGISTER_DEVICE_ID 0x00
@@ -28,8 +28,7 @@
 #define ADXL345_I2C_SCL_PIN 21
 #define ADXL343_I2C_ADDRESS 0x53
 #define ADXL345_DEVICE_ID 0xe5
-
-#define ACCELERATION_FACTOR (9.80665f/256)
+#define ADXL345_ACCELERATION_FACTOR (9.80665f/256)
 
 #define MOTOR_PWM_FREQUENCY 60
 #define MOTOR_PWM_WRAP 4096
@@ -39,7 +38,9 @@
 #define MOTOR_PWM_2A 18
 #define MOTOR_PWM_2B 19
 #define MOTOR_PWM_SLICE_2 1
-#define MOTOR_SPEED 0.79f // m/s
+
+#define ROBOT_RESET_BUTTON_PIN 22
+#define ROBOT_WALL_MAX_DISTANCE 20
 
 
 
@@ -50,7 +51,7 @@ typedef struct _SENSOR_DATA{
 
 
 
-static sensor_data_t _sensors[2];
+static volatile sensor_data_t _sensors[2];
 static volatile _Bool _sensor_offset=0;
 static int16_t _acceleration_offsets[2];
 
@@ -66,11 +67,11 @@ static inline void _update_sensors(void){
 	uint32_t start_time[ULTRASONIC_PIN_COUNT];
 	_Bool idx=!_sensor_offset;
 	for (unsigned int i=0;i<ULTRASONIC_PIN_COUNT;i++){
-		_sensors[idx].ultrasonic[i]=ULTRASONIC_MAX_DISTANCE_TIME;
+		_sensors[idx].ultrasonic[i]=ULTRASONIC_TRANSITION_VALUES(_sensors[!idx].ultrasonic[i],ULTRASONIC_MAX_DISTANCE_TIME);
 	}
 	while (time_us_32()<end);
 	gpio_put(ULTRASONIC_TRIGGER_PIN,0);
-	end=time_us_32()+ULTRASONIC_MAX_DISTANCE_TIME*5/2;
+	end=time_us_32()+ULTRASONIC_MAX_DISTANCE_TIME*4;
 	do{
 		uint32_t time=time_us_32();
 		if (time>=end){
@@ -78,23 +79,24 @@ static inline void _update_sensors(void){
 		}
 		uint32_t state=gpio_get_all()&mask;
 		uint32_t change=state^last;
-		if (change){
-			last=state;
-			do{
-				uint32_t i=__builtin_ctz(change);
-				uint32_t bit=1<<i;
-				change&=~bit;
-				i-=ULTRASONIC_PIN_OFFSET;
-				if (state&bit){
-					start_time[i]=time;
-				}
-				else{
-					time-=start_time[i];
-					_sensors[idx].ultrasonic[i]=(time>ULTRASONIC_MAX_DISTANCE_TIME?ULTRASONIC_MAX_DISTANCE_TIME:time);
-					mask&=~bit;
-				}
-			} while (change);
+		if (!change){
+			continue;
 		}
+		last=state;
+		do{
+			uint32_t i=__builtin_ctz(change);
+			uint32_t bit=1<<i;
+			change&=~bit;
+			i-=ULTRASONIC_PIN_OFFSET;
+			if (state&bit){
+				start_time[i]=time;
+			}
+			else{
+				time-=start_time[i];
+				_sensors[idx].ultrasonic[i]=ULTRASONIC_TRANSITION_VALUES(_sensors[!idx].ultrasonic[i],(time>ULTRASONIC_MAX_DISTANCE_TIME?ULTRASONIC_MAX_DISTANCE_TIME:time));
+				mask&=~bit;
+			}
+		} while (change);
 	} while (mask);
 	i2c_read_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,i2c_data,6,0);
 	_sensors[idx].accelerometer[0]=((int16_t*)i2c_data)[0]+_acceleration_offsets[0];
@@ -126,6 +128,13 @@ static inline void _init_led(void){
 
 
 
+static inline void _init_reset_pin(void){
+	gpio_init(ROBOT_RESET_BUTTON_PIN);
+	gpio_set_dir(ROBOT_RESET_BUTTON_PIN,GPIO_IN);
+}
+
+
+
 static inline void _init_ultrasonic(void){
 	gpio_init(ULTRASONIC_TRIGGER_PIN);
 	gpio_set_dir(ULTRASONIC_TRIGGER_PIN,GPIO_OUT);
@@ -133,6 +142,8 @@ static inline void _init_ultrasonic(void){
 	for (uint32_t i=0;i<ULTRASONIC_PIN_COUNT;i++){
 		gpio_init(i);
 		gpio_set_dir(i,GPIO_IN);
+		_sensors[0].ultrasonic[i]=ULTRASONIC_MAX_DISTANCE_TIME;
+		_sensors[1].ultrasonic[i]=ULTRASONIC_MAX_DISTANCE_TIME;
 	}
 }
 
@@ -148,7 +159,6 @@ static inline uint8_t _init_accelerometer(void){
 	i2c_write_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,1,0);
 	i2c_read_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,data,1,0);
 	if (data[0]!=ADXL345_DEVICE_ID){
-		printf("Incorrect i2c device ID (%u)\n",data);
 		return 0;
 	}
 	data[0]=ADXL345_REGISTER_POWER_CONTROL;
@@ -170,6 +180,10 @@ static inline uint8_t _init_accelerometer(void){
 
 
 static inline void _init_motors(void){
+	gpio_init(MOTOR_PWM_1A);
+	gpio_init(MOTOR_PWM_1B);
+	gpio_init(MOTOR_PWM_2A);
+	gpio_init(MOTOR_PWM_2B);
 	gpio_set_function(MOTOR_PWM_1A,GPIO_FUNC_PWM);
 	gpio_set_function(MOTOR_PWM_1B,GPIO_FUNC_PWM);
 	gpio_set_function(MOTOR_PWM_2A,GPIO_FUNC_PWM);
@@ -189,12 +203,15 @@ static inline void _init_motors(void){
 
 
 static void _thread(void){
-	_drive_motors(4096,4096);
+	_drive_motors(MOTOR_PWM_WRAP*3/4,MOTOR_PWM_WRAP*3/4);
 	while (1){
-		if (_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(20)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(20)){
-			_drive_motors(-4096,4096);
-			while (_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(20)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(20));
-			_drive_motors(4096,4096);
+		if (_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)){
+			gpio_put(PICO_DEFAULT_LED_PIN,1);
+			_drive_motors(-MOTOR_PWM_WRAP/2,MOTOR_PWM_WRAP/2);
+			uint32_t end=time_us_32()+500;
+			while (_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||time_us_32()<end);
+			gpio_put(PICO_DEFAULT_LED_PIN,0);
+			_drive_motors(MOTOR_PWM_WRAP*3/4,MOTOR_PWM_WRAP*3/4);
 		}
 	}
 }
@@ -202,27 +219,21 @@ static void _thread(void){
 
 
 int main(){
-	stdio_init_all();
-	stdio_usb_init();
 	_init_led();
+	_init_reset_pin();
 	_init_ultrasonic();
-	if (!_init_accelerometer()){
-		for (unsigned int i=0;i<20;i++){
-			gpio_put(PICO_DEFAULT_LED_PIN,i&1);
-			sleep_ms(50);
+	if (_init_accelerometer()){
+		_init_motors();
+		multicore_launch_core1(_thread);
+		while (!gpio_get(ROBOT_RESET_BUTTON_PIN)){
+			_update_sensors();
 		}
-		reset_usb_boot(0,0);
-		return 1;
+		multicore_reset_core1();
 	}
-	_init_motors();
-	multicore_launch_core1(_thread);
-	while (getchar_timeout_us(1)==PICO_ERROR_TIMEOUT){
-		gpio_put(PICO_DEFAULT_LED_PIN,!stdio_usb_connected());
-		uint32_t start=time_us_32();
-		_update_sensors();
-		uint32_t end=time_us_32();
-		printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%+05.2f %+05.2f}\n",(end-start)/1000,_sensors[_sensor_offset].ultrasonic[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].accelerometer[0]*ACCELERATION_FACTOR,_sensors[_sensor_offset].accelerometer[1]*ACCELERATION_FACTOR);
+	_drive_motors(0,0);
+	for (unsigned int i=0;i<10;i++){
+		gpio_put(PICO_DEFAULT_LED_PIN,i&1);
+		sleep_ms(50);
 	}
 	reset_usb_boot(0,0);
-	return 0;
 }
