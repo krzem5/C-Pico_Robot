@@ -182,11 +182,11 @@ int main(){
 	_init_led();
 	_init_ultrasonic();
 	if (!_init_accelerometer()){
+		gpio_put(PICO_DEFAULT_LED_PIN,1);
+		sleep_ms(1000);
 		reset_usb_boot(0,0);
 		return 1;
 	}
-	gpio_put(PICO_DEFAULT_LED_PIN,1);
-	sleep_ms(1000);
 	_init_motors();
 	while (getchar_timeout_us(1)==PICO_ERROR_TIMEOUT){
 		if (stdio_usb_connected()){
