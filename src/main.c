@@ -218,10 +218,10 @@ int main(){
 	multicore_launch_core1(_thread);
 	while (getchar_timeout_us(1)==PICO_ERROR_TIMEOUT){
 		gpio_put(PICO_DEFAULT_LED_PIN,!stdio_usb_connected());
-		// uint32_t start=time_us_32();
+		uint32_t start=time_us_32();
 		_update_sensors();
-		// uint32_t end=time_us_32();
-		// printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%+05.2f %+05.2f}\n",(end-start)/1000,_sensors[_sensor_offset].ultrasonic[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].accelerometer[0]*ACCELERATION_FACTOR,_sensors[_sensor_offset].accelerometer[1]*ACCELERATION_FACTOR);
+		uint32_t end=time_us_32();
+		printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%+05.2f %+05.2f}\n",(end-start)/1000,_sensors[_sensor_offset].ultrasonic[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].accelerometer[0]*ACCELERATION_FACTOR,_sensors[_sensor_offset].accelerometer[1]*ACCELERATION_FACTOR);
 	}
 	reset_usb_boot(0,0);
 	return 0;
