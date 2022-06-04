@@ -3,6 +3,7 @@
 #include <hardware/i2c.h>
 #include <hardware/pwm.h>
 #include <pico/bootrom.h>
+#include <pico/multicore.h>
 #include <pico/stdlib.h>
 
 
@@ -187,6 +188,19 @@ static inline void _init_motors(void){
 
 
 
+static void _thread(void){
+	_drive_motors(4096,4096);
+	while (1){
+		if (_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(20)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(20)){
+			_drive_motors(-4096,4096);
+			while (_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(20)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(20));
+			_drive_motors(4096,4096);
+		}
+	}
+}
+
+
+
 int main(){
 	stdio_init_all();
 	stdio_usb_init();
@@ -201,12 +215,13 @@ int main(){
 		return 1;
 	}
 	_init_motors();
+	multicore_launch_core1(_thread);
 	while (getchar_timeout_us(1)==PICO_ERROR_TIMEOUT){
 		gpio_put(PICO_DEFAULT_LED_PIN,!stdio_usb_connected());
-		uint32_t start=time_us_32();
+		// uint32_t start=time_us_32();
 		_update_sensors();
-		uint32_t end=time_us_32();
-		printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%+05.2f %+05.2f}\n",(end-start)/1000,_sensors[_sensor_offset].ultrasonic[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].accelerometer[0]*ACCELERATION_FACTOR,_sensors[_sensor_offset].accelerometer[1]*ACCELERATION_FACTOR);
+		// uint32_t end=time_us_32();
+		// printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%+05.2f %+05.2f}\n",(end-start)/1000,_sensors[_sensor_offset].ultrasonic[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].accelerometer[0]*ACCELERATION_FACTOR,_sensors[_sensor_offset].accelerometer[1]*ACCELERATION_FACTOR);
 	}
 	reset_usb_boot(0,0);
 	return 0;
