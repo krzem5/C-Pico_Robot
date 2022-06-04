@@ -12,8 +12,9 @@
 #define ULTRASONIC_PIN_COUNT 8
 #define ULTRASONIC_PIN_OFFSET 2
 #define ULTRASONIC_MAX_DISTANCE 75
-#define ULTRASONIC_MAX_DISTANCE_TIME ((uint32_t)(ULTRASONIC_MAX_DISTANCE/ULTRASONIC_SOUND_SPEED_FACTOR*2))
+#define ULTRASONIC_MAX_DISTANCE_TIME ULTRASONIC_DISTANCE_TO_TIME(ULTRASONIC_MAX_DISTANCE)
 #define ULTRASONIC_SOUND_SPEED_FACTOR 0.0343f
+#define ULTRASONIC_DISTANCE_TO_TIME(x) ((uint32_t)((x)/ULTRASONIC_SOUND_SPEED_FACTOR*2))
 
 #define ADXL345_BAUDRATE 400000
 #define ADXL345_REGISTER_DEVICE_ID 0x00
@@ -37,11 +38,19 @@
 #define MOTOR_PWM_2A 18
 #define MOTOR_PWM_2B 19
 #define MOTOR_PWM_SLICE_2 1
+#define MOTOR_SPEED 0.79f // m/s
 
 
 
-static uint32_t _ultrasonic_values[ULTRASONIC_PIN_COUNT];
-static int16_t _acceleration_values[2];
+typedef struct _SENSOR_DATA{
+	uint32_t ultrasonic[ULTRASONIC_PIN_COUNT];
+	int16_t accelerometer[2];
+} sensor_data_t;
+
+
+
+static sensor_data_t _sensors[2];
+static volatile _Bool _sensor_offset=0;
 static int16_t _acceleration_offsets[2];
 
 
@@ -54,12 +63,13 @@ static inline void _update_sensors(void){
 	uint32_t mask=((1<<ULTRASONIC_PIN_COUNT)-1)<<ULTRASONIC_PIN_OFFSET;
 	uint32_t last=0;
 	uint32_t start_time[ULTRASONIC_PIN_COUNT];
+	_Bool idx=!_sensor_offset;
 	for (unsigned int i=0;i<ULTRASONIC_PIN_COUNT;i++){
-		_ultrasonic_values[i]=ULTRASONIC_MAX_DISTANCE_TIME;
+		_sensors[idx].ultrasonic[i]=ULTRASONIC_MAX_DISTANCE_TIME;
 	}
 	while (time_us_32()<end);
 	gpio_put(ULTRASONIC_TRIGGER_PIN,0);
-	end=time_us_32()+ULTRASONIC_MAX_DISTANCE_TIME*2;
+	end=time_us_32()+ULTRASONIC_MAX_DISTANCE_TIME*5/2;
 	do{
 		uint32_t time=time_us_32();
 		if (time>=end){
@@ -79,15 +89,16 @@ static inline void _update_sensors(void){
 				}
 				else{
 					time-=start_time[i];
-					_ultrasonic_values[i]=(time>ULTRASONIC_MAX_DISTANCE_TIME?ULTRASONIC_MAX_DISTANCE_TIME:time);
+					_sensors[idx].ultrasonic[i]=(time>ULTRASONIC_MAX_DISTANCE_TIME?ULTRASONIC_MAX_DISTANCE_TIME:time);
 					mask&=~bit;
 				}
 			} while (change);
 		}
 	} while (mask);
 	i2c_read_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,i2c_data,6,0);
-	_acceleration_values[0]=((int16_t*)i2c_data)[0]+_acceleration_offsets[0];
-	_acceleration_values[1]=((int16_t*)i2c_data)[2]+_acceleration_offsets[1];
+	_sensors[idx].accelerometer[0]=((int16_t*)i2c_data)[0]+_acceleration_offsets[0];
+	_sensors[idx].accelerometer[1]=((int16_t*)i2c_data)[2]+_acceleration_offsets[1];
+	_sensor_offset=idx;
 }
 
 
@@ -182,23 +193,20 @@ int main(){
 	_init_led();
 	_init_ultrasonic();
 	if (!_init_accelerometer()){
-		gpio_put(PICO_DEFAULT_LED_PIN,1);
-		sleep_ms(1000);
+		for (unsigned int i=0;i<20;i++){
+			gpio_put(PICO_DEFAULT_LED_PIN,i&1);
+			sleep_ms(50);
+		}
 		reset_usb_boot(0,0);
 		return 1;
 	}
 	_init_motors();
 	while (getchar_timeout_us(1)==PICO_ERROR_TIMEOUT){
-		if (stdio_usb_connected()){
-			gpio_put(PICO_DEFAULT_LED_PIN,0);
-		}
-		else{
-			gpio_put(PICO_DEFAULT_LED_PIN,1);
-		}
+		gpio_put(PICO_DEFAULT_LED_PIN,!stdio_usb_connected());
 		uint32_t start=time_us_32();
 		_update_sensors();
 		uint32_t end=time_us_32();
-		printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%+05.2f %+05.2f}\n",(end-start)/1000,_ultrasonic_values[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_ultrasonic_values[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_acceleration_values[0]*ACCELERATION_FACTOR,_acceleration_values[1]*ACCELERATION_FACTOR);
+		printf("[%0.2u]: {%05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f %05.2f}, {%+05.2f %+05.2f}\n",(end-start)/1000,_sensors[_sensor_offset].ultrasonic[0]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[1]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[2]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[3]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[4]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[5]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[6]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].ultrasonic[7]*ULTRASONIC_SOUND_SPEED_FACTOR/2,_sensors[_sensor_offset].accelerometer[0]*ACCELERATION_FACTOR,_sensors[_sensor_offset].accelerometer[1]*ACCELERATION_FACTOR);
 	}
 	reset_usb_boot(0,0);
 	return 0;
