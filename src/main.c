@@ -214,7 +214,8 @@ static void _thread(void){
 			else{
 				_drive_motors(-MOTOR_PWM_WRAP/2,MOTOR_PWM_WRAP/2);
 			}
-			while (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE));
+			uint64_t end=time_us_64()+1000;
+			while (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||time_us_64()<end);
 			_drive_motors(MOTOR_PWM_WRAP*3/4,MOTOR_PWM_WRAP*3/4);
 			gpio_put(PICO_DEFAULT_LED_PIN,0);
 		}
