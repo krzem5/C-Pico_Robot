@@ -208,7 +208,7 @@ static void _thread(void){
 		if (_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)){
 			gpio_put(PICO_DEFAULT_LED_PIN,1);
 			_drive_motors(-MOTOR_PWM_WRAP/2,MOTOR_PWM_WRAP/2);
-			uint32_t end=time_us_32()+500;
+			uint32_t end=time_us_32()+2000;
 			while (_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||time_us_32()<end);
 			gpio_put(PICO_DEFAULT_LED_PIN,0);
 			_drive_motors(MOTOR_PWM_WRAP*3/4,MOTOR_PWM_WRAP*3/4);
