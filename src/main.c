@@ -39,9 +39,9 @@
 #define MOTOR_PWM_2B 19
 #define MOTOR_PWM_SLICE_2 1
 
-#define ROBOT_RESET_BUTTON_PIN 22
-#define ROBOT_WALL_MAX_DISTANCE 20
-#define ROBOT_WALL_MAX_SIDE_DISTANCE 10
+#define RESET_BUTTON_PIN 22
+#define WALL_MAX_DISTANCE 20
+#define WALL_MAX_SIDE_DISTANCE 10
 
 #define MOVEMENT_DATA_COLLECTION_TIME_INTERVAL 250000
 #define MOVEMENT_DATA_STUCK_HISTORY_COUNT 16
@@ -143,8 +143,8 @@ static inline void _init_led(void){
 
 
 static inline void _init_reset_pin(void){
-	gpio_init(ROBOT_RESET_BUTTON_PIN);
-	gpio_set_dir(ROBOT_RESET_BUTTON_PIN,GPIO_IN);
+	gpio_init(RESET_BUTTON_PIN);
+	gpio_set_dir(RESET_BUTTON_PIN,GPIO_IN);
 }
 
 
@@ -250,7 +250,7 @@ static void _thread(void){
 	};
 	while (1){
 		_collect_movement_data(&mov);
-		if (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)){
+		if (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_SIDE_DISTANCE)){
 			gpio_put(PICO_DEFAULT_LED_PIN,1);
 			if (_sensors[_sensor_offset].ultrasonic[2]+_sensors[_sensor_offset].ultrasonic[3]*3<_sensors[_sensor_offset].ultrasonic[4]*3+_sensors[_sensor_offset].ultrasonic[5]){
 				_drive_motors(MOTOR_PWM_WRAP/2,-MOTOR_PWM_WRAP/2);
@@ -259,7 +259,7 @@ static void _thread(void){
 				_drive_motors(-MOTOR_PWM_WRAP/2,MOTOR_PWM_WRAP/2);
 			}
 			uint64_t end=time_us_64()+1000;
-			while (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||time_us_64()<end){
+			while (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_SIDE_DISTANCE)||time_us_64()<end){
 				if (_collect_movement_data(&mov)){
 					gpio_put(PICO_DEFAULT_LED_PIN,0);
 					goto _next_loop;
@@ -281,7 +281,7 @@ int main(){
 	if (_init_accelerometer()){
 		_init_motors();
 		multicore_launch_core1(_thread);
-		while (!gpio_get(ROBOT_RESET_BUTTON_PIN)){
+		while (!gpio_get(RESET_BUTTON_PIN)){
 			_update_sensors();
 		}
 		multicore_reset_core1();
