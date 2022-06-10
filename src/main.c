@@ -43,12 +43,25 @@
 #define ROBOT_WALL_MAX_DISTANCE 20
 #define ROBOT_WALL_MAX_SIDE_DISTANCE 10
 
+#define MOVEMENT_DATA_COLLECTION_TIME_INTERVAL 250000
+#define MOVEMENT_DATA_STUCK_HISTORY_COUNT 16
+#define MOVEMENT_DATA_NO_MOVEMENT_SPEED 0.55
+#define MOVEMENT_DATA_REVERSE_COUNT 20
+
 
 
 typedef struct _SENSOR_DATA{
 	uint32_t ultrasonic[ULTRASONIC_PIN_COUNT];
 	int16_t accelerometer[2];
 } sensor_data_t;
+
+
+
+typedef struct _MOVEMENT_DATA{
+	uint64_t next_time;
+	uint32_t history;
+	uint32_t count;
+} movement_data_t;
 
 
 
@@ -203,22 +216,59 @@ static inline void _init_motors(void){
 
 
 
+static inline _Bool _collect_movement_data(movement_data_t* mov){
+	if (time_us_64()<mov->next_time){
+		return 0;
+	}
+	mov->next_time=time_us_64()+MOVEMENT_DATA_COLLECTION_TIME_INTERVAL;
+	_Bool state=(_sensors[_sensor_offset].accelerometer[0]*ADXL345_ACCELERATION_FACTOR*_sensors[_sensor_offset].accelerometer[0]*ADXL345_ACCELERATION_FACTOR+_sensors[_sensor_offset].accelerometer[1]*ADXL345_ACCELERATION_FACTOR*_sensors[_sensor_offset].accelerometer[1]*ADXL345_ACCELERATION_FACTOR<MOVEMENT_DATA_NO_MOVEMENT_SPEED*MOVEMENT_DATA_NO_MOVEMENT_SPEED);
+	mov->count+=state-(mov->history>>31);
+	mov->history=(mov->history<<1)|state;
+	if (mov->count<MOVEMENT_DATA_STUCK_HISTORY_COUNT){
+		return 0;
+	}
+	_drive_motors(-MOTOR_PWM_WRAP,-MOTOR_PWM_WRAP);
+	for (uint32_t i=0;i<MOVEMENT_DATA_REVERSE_COUNT;i++){
+		gpio_put(PICO_DEFAULT_LED_PIN,i&1);
+		sleep_ms(100);
+	}
+	gpio_put(PICO_DEFAULT_LED_PIN,0);
+	_drive_motors(MOTOR_PWM_WRAP*3/4,MOTOR_PWM_WRAP*3/4);
+	mov->count=0;
+	mov->history=0;
+	return 1;
+}
+
+
+
 static void _thread(void){
 	_drive_motors(MOTOR_PWM_WRAP*3/4,MOTOR_PWM_WRAP*3/4);
+	movement_data_t mov={
+		0,
+		0,
+		0
+	};
 	while (1){
+		_collect_movement_data(&mov);
 		if (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)){
 			gpio_put(PICO_DEFAULT_LED_PIN,1);
-			if (_sensors[_sensor_offset].ultrasonic[2]*3+_sensors[_sensor_offset].ultrasonic[3]<_sensors[_sensor_offset].ultrasonic[4]*3+_sensors[_sensor_offset].ultrasonic[5]){
+			if (_sensors[_sensor_offset].ultrasonic[2]+_sensors[_sensor_offset].ultrasonic[3]*3<_sensors[_sensor_offset].ultrasonic[4]*3+_sensors[_sensor_offset].ultrasonic[5]){
 				_drive_motors(MOTOR_PWM_WRAP/2,-MOTOR_PWM_WRAP/2);
 			}
 			else{
 				_drive_motors(-MOTOR_PWM_WRAP/2,MOTOR_PWM_WRAP/2);
 			}
 			uint64_t end=time_us_64()+1000;
-			while (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||time_us_64()<end);
+			while (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(ROBOT_WALL_MAX_SIDE_DISTANCE)||time_us_64()<end){
+				if (_collect_movement_data(&mov)){
+					gpio_put(PICO_DEFAULT_LED_PIN,0);
+					goto _next_loop;
+				}
+			}
 			_drive_motors(MOTOR_PWM_WRAP*3/4,MOTOR_PWM_WRAP*3/4);
 			gpio_put(PICO_DEFAULT_LED_PIN,0);
 		}
+_next_loop:;
 	}
 }
 
