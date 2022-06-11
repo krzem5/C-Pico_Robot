@@ -121,8 +121,8 @@ static inline void _update_sensors(void){
 
 
 static inline void _drive_motors(int32_t left,int32_t right){
-	pwm_set_both_levels(MOTOR_PWM_SLICE_1,(left>0?left:0),(left<0?-left:0));
-	pwm_set_both_levels(MOTOR_PWM_SLICE_2,(right>0?right:0),(right<0?-right:0));
+	pwm_set_both_levels(MOTOR_PWM_SLICE_1,(left<0?-left:0),(left>0?left:0));
+	pwm_set_both_levels(MOTOR_PWM_SLICE_2,(right<0?-right:0),(right>0?right:0));
 }
 
 
@@ -253,10 +253,10 @@ static void _thread(void){
 		if (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_SIDE_DISTANCE)){
 			gpio_put(PICO_DEFAULT_LED_PIN,1);
 			if (_sensors[_sensor_offset].ultrasonic[2]+_sensors[_sensor_offset].ultrasonic[3]*3<_sensors[_sensor_offset].ultrasonic[4]*3+_sensors[_sensor_offset].ultrasonic[5]){
-				_drive_motors(MOTOR_PWM_WRAP/2,-MOTOR_PWM_WRAP/2);
+				_drive_motors(-MOTOR_PWM_WRAP/2,MOTOR_PWM_WRAP/2);
 			}
 			else{
-				_drive_motors(-MOTOR_PWM_WRAP/2,MOTOR_PWM_WRAP/2);
+				_drive_motors(MOTOR_PWM_WRAP/2,-MOTOR_PWM_WRAP/2);
 			}
 			uint64_t end=time_us_64()+1000;
 			while (_sensors[_sensor_offset].ultrasonic[2]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_SIDE_DISTANCE)||_sensors[_sensor_offset].ultrasonic[3]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[4]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_DISTANCE)||_sensors[_sensor_offset].ultrasonic[5]<ULTRASONIC_DISTANCE_TO_TIME(WALL_MAX_SIDE_DISTANCE)||time_us_64()<end){
