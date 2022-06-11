@@ -75,7 +75,7 @@ static inline void _update_sensors(void){
 	uint8_t i2c_data[6]={ADXL345_REGISTER_DATA};
 	i2c_write_blocking(ADXL345_I2C_BLOCK,ADXL343_I2C_ADDRESS,i2c_data,1,0);
 	gpio_put(ULTRASONIC_TRIGGER_PIN,1);
-	uint32_t end=time_us_32()+ULTRASONIC_PIN_TRIGGER_PULSE_US;
+	uint64_t end=time_us_64()+ULTRASONIC_PIN_TRIGGER_PULSE_US;
 	uint32_t mask=((1<<ULTRASONIC_PIN_COUNT)-1)<<ULTRASONIC_PIN_OFFSET;
 	uint32_t last=0;
 	uint32_t start_time[ULTRASONIC_PIN_COUNT];
@@ -83,11 +83,11 @@ static inline void _update_sensors(void){
 	for (unsigned int i=0;i<ULTRASONIC_PIN_COUNT;i++){
 		_sensors[idx].ultrasonic[i]=ULTRASONIC_TRANSITION_VALUES(_sensors[!idx].ultrasonic[i],ULTRASONIC_MAX_DISTANCE_TIME);
 	}
-	while (time_us_32()<end);
+	while (time_us_64()<end);
 	gpio_put(ULTRASONIC_TRIGGER_PIN,0);
-	end=time_us_32()+ULTRASONIC_MAX_DISTANCE_TIME*4;
+	end=time_us_64()+ULTRASONIC_MAX_DISTANCE_TIME*4;
 	do{
-		uint32_t time=time_us_32();
+		uint64_t time=time_us_64();
 		if (time>=end){
 			break;
 		}
